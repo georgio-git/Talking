@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ephemeral Public Talk</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --primary: #00e5ff;
+      --text: #ffffff;
+      --text-muted: #888888;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .chat-container {
+      width: 100%;
+      max-width: 500px;
+      height: 90vh;
+      background: var(--surface);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    .header {
+      background: #2a2a2a;
+      padding: 1rem;
+      text-align: center;
+      font-weight: bold;
+      border-bottom: 1px solid #333;
+    }
+    .status {
+      font-size: 0.8rem;
+      color: var(--primary);
+    }
+    #chat-box {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .message {
+      background: #2a2a2a;
+      padding: 10px 15px;
+      border-radius: 8px;
+      word-wrap: break-word;
+      animation: fadeIn 0.3s ease-in;
+    }
+    .message .username {
+      font-size: 0.8rem;
+      color: var(--primary);
+      margin-bottom: 4px;
+      font-weight: bold;
+    }
+    .input-area {
+      display: flex;
+      padding: 1rem;
+      background: #2a2a2a;
+      gap: 10px;
+      border-top: 1px solid #333;
+    }
+    input {
+      background: #1e1e1e;
+      border: 1px solid #444;
+      color: white;
+      padding: 10px;
+      border-radius: 6px;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--primary);
+    }
+    #msg-input {
+      flex: 1;
+    }
+    #name-input {
+      width: 80px;
+    }
+    button {
+      background: var(--primary);
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+  <!-- Import MQTT library from CDN to handle the WebSocket connection -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="header">
+      <div>Public Talk</div>
+      <div class="status" id="status-text">Connecting to relay...</div>
+    </div>
+    
+    <div id="chat-box">
+      <!-- Messages will appear here -->
+    </div>
+
+    <div class="input-area">
+      <input type="text" id="name-input" placeholder="Name" value="Guest">
+      <input type="text" id="msg-input" placeholder="Type a message..." autocomplete="off">
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    // 1. Connect to a free public MQTT broker via secure WebSockets
+    const client = mqtt.connect('wss://test.mosquitto.org:8081');
+    
+    // 2. Define a unique room ID. (Change this if you want a private room!)
+    const ROOM_ID = 'my-unique-public-talk-room-999';
+
+    const chatBox = document.getElementById('chat-box');
+    const msgInput = document.getElementById('msg-input');
+    const nameInput = document.getElementById('name-input');
+    const statusText = document.getElementById('status-text');
+
+    // 3. When connected, subscribe to the room
+    client.on('connect', () => {
+      statusText.innerText = "Live: Messages disappear on exit";
+      client.subscribe(ROOM_ID);
+    });
+
+    // 4. When a message is received from the relay, show it in the UI
+    client.on('message', (topic, message) => {
+      const data = JSON.parse(message.toString());
+      displayMessage(data.name, data.text);
+    });
+
+    // 5. Send message function
+    function sendMessage() {
+      const text = msgInput.value.trim();
+      const name = nameInput.value.trim() || 'Anonymous';
+      
+      if (text !== '') {
+        const payload = JSON.stringify({ name: name, text: text });
+        // Publish to the relay tower
+        client.publish(ROOM_ID, payload);
+        msgInput.value = ''; // Clear input
+      }
+    }
+
+    // Allow pressing "Enter" to send
+    msgInput.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    // Helper function to render messages
+    function displayMessage(name, text) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'message';
+      msgDiv.innerHTML = `<div class="username">${name}</div><div>${text}</div>`;
+      chatBox.appendChild(msgDiv);
+      // Auto-scroll to bottom
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
+
+</body>
+</html>
